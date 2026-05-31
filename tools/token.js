@@ -1,4 +1,6 @@
-const DATAPI_BASE = "https://datapi.jup.ag/v1";
+import { config } from "../config.js";
+
+const DATAPI_BASE = config.endpoints.jupiterDataApi;
 
 /**
  * Get the narrative/story behind a token from Jupiter ChainInsight.

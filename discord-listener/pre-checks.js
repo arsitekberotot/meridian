@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import axios from "axios";
+import { config } from "../config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -46,7 +47,7 @@ export function blacklistCheck(mint) {
 export async function resolvePool(address) {
   // Try as pool address directly
   try {
-    const res = await axios.get(`https://dlmm.datapi.meteora.ag/pools/${address}`, { timeout: 8000 });
+    const res = await axios.get(`${config.endpoints.dlmmDataApi}/pools/${address}`, { timeout: 8000 });
     const pool = res.data;
     if (pool?.address || pool?.pubkey || pool?.pool_address) {
       const poolAddr = pool.address || pool.pubkey || pool.pool_address || address;
@@ -60,7 +61,7 @@ export async function resolvePool(address) {
 
   // Try as token mint via DexScreener → find Meteora DLMM pools
   try {
-    const res = await axios.get(`https://api.dexscreener.com/latest/dex/search?q=${address}`, { timeout: 8000 });
+    const res = await axios.get(`${config.endpoints.dexScreener}/latest/dex/search?q=${address}`, { timeout: 8000 });
     const pairs = res.data?.pairs || [];
     const meteoraPairs = pairs.filter(p =>
       p.dexId === "meteora-dlmm" &&
@@ -90,7 +91,7 @@ export async function resolvePool(address) {
 export async function rugCheck(mint) {
   if (!mint) return { pass: true, rug_score: null }; // can't check without mint
   try {
-    const res = await axios.get(`https://api.rugcheck.xyz/v1/tokens/${mint}/report`, { timeout: 10000 });
+    const res = await axios.get(`${config.endpoints.rugcheck}/tokens/${mint}/report`, { timeout: 10000 });
     const data = res.data;
     if (data.rugged) return { pass: false, reason: "rugcheck: token is rugged" };
     if ((data.score || 0) > 50000) return { pass: false, reason: `rugcheck: score too high (${data.score})` };
@@ -116,7 +117,7 @@ export async function deployerCheck(poolAddress) {
     if (blocked.length === 0) return { pass: true };
 
     // Fetch pool creator from Meteora API
-    const res = await axios.get(`https://dlmm.datapi.meteora.ag/pools/${poolAddress}`, { timeout: 8000 });
+    const res = await axios.get(`${config.endpoints.dlmmDataApi}/pools/${poolAddress}`, { timeout: 8000 });
     const creator = res.data?.creator || res.data?.creator_address;
     if (creator && blocked.includes(creator)) {
       return { pass: false, reason: `deployer blacklisted: ${creator}` };
@@ -137,7 +138,7 @@ export async function feesCheck(mint) {
   } catch { /* use default */ }
 
   try {
-    const res = await fetch(`https://datapi.jup.ag/v1/assets/search?query=${mint}`);
+    const res = await fetch(`${config.endpoints.jupiterDataApi}/assets/search?query=${mint}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const tokens = Array.isArray(data) ? data : [data];

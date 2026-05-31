@@ -30,6 +30,9 @@ import { appendDecision } from "../decision-log.js";
 import { agentMeridianJson, getAgentIdForRequests, getAgentMeridianHeaders } from "./agent-meridian.js";
 import { getAndClearStagedSignals } from "../signal-tracker.js";
 
+// Meteora DLMM data API base (env-overridable via config.endpoints — issue #69)
+const DLMM_BASE = config.endpoints.dlmmDataApi;
+
 // ─── Lazy SDK loader ───────────────────────────────────────────
 // @meteora-ag/dlmm → @coral-xyz/anchor uses CJS directory imports
 // that break in ESM on Node 24. Dynamic import defers loading until
@@ -409,7 +412,7 @@ async function getPoolMetadata(poolAddress) {
   }
 
   try {
-    const res = await fetch(`https://dlmm.datapi.meteora.ag/pools/${key}`);
+    const res = await fetch(`${DLMM_BASE}/pools/${key}`);
     if (!res.ok) {
       throw new Error(`Pool metadata API ${res.status}`);
     }
@@ -924,7 +927,7 @@ const POSITIONS_CACHE_TTL = 5 * 60_000; // 5 minutes
 let _positionsCache = null;
 let _positionsCacheAt = 0;
 let _positionsInflight = null; // deduplicates concurrent calls
-const LPAGENT_API = "https://api.lpagent.io/open-api/v1";
+const LPAGENT_API = config.endpoints.lpAgent;
 
 async function fetchLpAgentOpenPositions(walletAddress) {
   if (!process.env.LPAGENT_API_KEY) return {};
@@ -957,7 +960,7 @@ async function fetchLpAgentOpenPositions(walletAddress) {
 
 // ─── Fetch DLMM PnL API for all positions in a pool ────────────
 async function fetchDlmmPnlForPool(poolAddress, walletAddress) {
-  const url = `https://dlmm.datapi.meteora.ag/positions/${poolAddress}/pnl?user=${walletAddress}&status=open&pageSize=100&page=1`;
+  const url = `${DLMM_BASE}/positions/${poolAddress}/pnl?user=${walletAddress}&status=open&pageSize=100&page=1`;
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -1219,7 +1222,7 @@ export async function getMyPositions({ force = false, silent = false, wallet_add
     // Portfolio API discovers open pools/positions for this wallet.
     // Detailed range data stays on Meteora PnL API; value/PnL can be overridden by LPAgent below.
     if (!silent) log("positions", "Fetching portfolio via Meteora portfolio API...");
-    const portfolioUrl = `https://dlmm.datapi.meteora.ag/portfolio/open?user=${walletAddress}`;
+    const portfolioUrl = `${DLMM_BASE}/portfolio/open?user=${walletAddress}`;
     const res = await fetch(portfolioUrl);
     if (!res.ok) throw new Error(`Portfolio API ${res.status}: ${await res.text().catch(() => "")}`);
     const portfolio = await res.json();
@@ -1460,7 +1463,7 @@ export async function getWalletPositions({ wallet_address }) {
 
 // ─── Search Pools by Query ─────────────────────────────────────
 export async function searchPools({ query, limit = 10 }) {
-  const url = `https://dlmm.datapi.meteora.ag/pools?query=${encodeURIComponent(query)}`;
+  const url = `${DLMM_BASE}/pools?query=${encodeURIComponent(query)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Pool search API error: ${res.status} ${res.statusText}`);
   const data = await res.json();
@@ -1658,7 +1661,7 @@ export async function closePosition({ position_address, reason }) {
         let initialUsd = 0;
         let feesUsd = tracked.total_fees_claimed_usd || 0;
         try {
-          const closedUrl = `https://dlmm.datapi.meteora.ag/positions/${poolAddress}/pnl?user=${wallet.publicKey.toString()}&status=closed&pageSize=50&page=1`;
+          const closedUrl = `${DLMM_BASE}/positions/${poolAddress}/pnl?user=${wallet.publicKey.toString()}&status=closed&pageSize=50&page=1`;
           for (let attempt = 0; attempt < 6; attempt++) {
             const res = await fetch(closedUrl);
             if (res.ok) {
@@ -1911,7 +1914,7 @@ export async function closePosition({ position_address, reason }) {
       let initialUsd = 0;
       let feesUsd = tracked.total_fees_claimed_usd || 0;
       try {
-        const closedUrl = `https://dlmm.datapi.meteora.ag/positions/${poolAddress}/pnl?user=${wallet.publicKey.toString()}&status=closed&pageSize=50&page=1`;
+        const closedUrl = `${DLMM_BASE}/positions/${poolAddress}/pnl?user=${wallet.publicKey.toString()}&status=closed&pageSize=50&page=1`;
         for (let attempt = 0; attempt < 6; attempt++) {
           const res = await fetch(closedUrl);
           if (res.ok) {

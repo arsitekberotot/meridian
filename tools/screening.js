@@ -7,9 +7,9 @@ import { confirmIndicatorPreset } from "./chart-indicators.js";
 import { analyzeZone, clearZoneCache } from "./zones.js";
 import { getAgentMeridianBase, getAgentMeridianHeaders } from "./agent-meridian.js";
 
-const DATAPI_JUP = "https://datapi.jup.ag/v1";
+const DATAPI_JUP = config.endpoints.jupiterDataApi;
 
-const POOL_DISCOVERY_BASE = "https://pool-discovery-api.datapi.meteora.ag";
+const POOL_DISCOVERY_BASE = config.endpoints.poolDiscovery;
 const MIN_VOLATILITY_TIMEFRAME = "30m";
 const TIMEFRAME_MINUTES = {
   "5m": 5,
@@ -292,7 +292,7 @@ async function enrichDiscordSignalLaunchpads(rawPools) {
 }
 
 async function findRivalPool(mint) {
-  const url = `https://dlmm.datapi.meteora.ag/pools?query=${encodeURIComponent(mint)}&sort_by=${encodeURIComponent("tvl:desc")}&filter_by=${encodeURIComponent(`tvl>${PVP_MIN_ACTIVE_TVL}`)}`;
+  const url = `${config.endpoints.dlmmDataApi}/pools?query=${encodeURIComponent(mint)}&sort_by=${encodeURIComponent("tvl:desc")}&filter_by=${encodeURIComponent(`tvl>${PVP_MIN_ACTIVE_TVL}`)}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`rival pool search ${res.status}`);
   const data = await res.json();

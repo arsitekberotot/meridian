@@ -6,7 +6,7 @@
 import crypto from "crypto";
 import { config } from "../config.js";
 
-const BASE = "https://web3.okx.com";
+const BASE = config.endpoints.okx;
 const CHAIN_SOLANA = "501";
 const PUBLIC_HEADERS = { "Ok-Access-Client-type": "agent-cli" };
 const OKX_API_KEY = process.env.OKX_API_KEY || process.env.OK_ACCESS_KEY || "";

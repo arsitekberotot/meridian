@@ -29,7 +29,7 @@ import { execSync, spawn } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const USER_CONFIG_PATH = path.join(__dirname, "../user-config.json");
-const POOL_DISCOVERY_BASE = "https://pool-discovery-api.datapi.meteora.ag";
+const POOL_DISCOVERY_BASE = config.endpoints.poolDiscovery;
 const MIN_VOLATILITY_TIMEFRAME = "30m";
 const TIMEFRAME_MINUTES = {
   "5m": 5,

@@ -5,7 +5,7 @@ import { safeNumber } from "../utils/number.js";
 // OHLCV + volume history live on the Meteora DLMM data API (same host as
 // findRivalPool in screening.js). Only the pool-ohlcv slash command used this
 // before; here we wire it into a real tool for pivot-zone analysis.
-const DLMM_DATAPI_BASE = "https://dlmm.datapi.meteora.ag";
+const DLMM_DATAPI_BASE = config.endpoints.dlmmDataApi;
 
 // Per-cycle OHLCV cache: keyed by `${pool}:${timeframe}`. Cleared by callers
 // between screening cycles via clearZoneCache() so a single cycle never refetches

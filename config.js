@@ -180,6 +180,22 @@ export const config = {
     lpAgentRelayEnabled: u.lpAgentRelayEnabled ?? false,
   },
 
+  // ─── External API Base URLs ────────────
+  // Override any host via env or user-config without editing source (issue #69).
+  // Precedence: user-config.json → env var → default.
+  endpoints: {
+    dlmmDataApi:    nonEmptyString(u.dlmmDataApiUrl,    process.env.DLMM_DATAPI_URL,    "https://dlmm.datapi.meteora.ag"),
+    poolDiscovery:  nonEmptyString(u.poolDiscoveryUrl,  process.env.POOL_DISCOVERY_URL, "https://pool-discovery-api.datapi.meteora.ag"),
+    jupiterDataApi: nonEmptyString(u.jupiterDataApiUrl, process.env.JUPITER_DATAPI_URL, "https://datapi.jup.ag/v1"),
+    jupiterPrice:   nonEmptyString(u.jupiterPriceUrl,   process.env.JUPITER_PRICE_URL,  "https://api.jup.ag/price/v3"),
+    jupiterSwap:    nonEmptyString(u.jupiterSwapUrl,    process.env.JUPITER_SWAP_URL,   "https://api.jup.ag/swap/v2"),
+    helius:         nonEmptyString(u.heliusApiUrl,      process.env.HELIUS_API_URL,     "https://api.helius.xyz/v1"),
+    okx:            nonEmptyString(u.okxApiUrl,         process.env.OKX_API_URL,        "https://web3.okx.com"),
+    lpAgent:        nonEmptyString(u.lpAgentApiUrl,     process.env.LPAGENT_API_URL,    "https://api.lpagent.io/open-api/v1"),
+    dexScreener:    nonEmptyString(u.dexScreenerUrl,    process.env.DEXSCREENER_URL,    "https://api.dexscreener.com"),
+    rugcheck:       nonEmptyString(u.rugcheckUrl,       process.env.RUGCHECK_URL,       "https://api.rugcheck.xyz/v1"),
+  },
+
   jupiter: {
     // Internal Jupiter Ultra settings; override by env only, do not expose in user-config.
     apiKey: process.env.JUPITER_API_KEY ?? "",

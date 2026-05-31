@@ -25,8 +25,8 @@ function getWallet() {
   return _wallet;
 }
 
-const JUPITER_PRICE_API = "https://api.jup.ag/price/v3";
-const JUPITER_SWAP_V2_API = "https://api.jup.ag/swap/v2";
+const JUPITER_PRICE_API = config.endpoints.jupiterPrice;
+const JUPITER_SWAP_V2_API = config.endpoints.jupiterSwap;
 const DEFAULT_JUPITER_API_KEY = "b15d42e9-e0e4-4f90-a424-ae41ceeaa382";
 
 function getJupiterApiKey() {
@@ -71,7 +71,7 @@ export async function getWalletBalances() {
   }
 
   try {
-    const url = `https://api.helius.xyz/v1/wallet/${walletAddress}/balances?api-key=${HELIUS_KEY}`;
+    const url = `${config.endpoints.helius}/wallet/${walletAddress}/balances?api-key=${HELIUS_KEY}`;
     const res = await fetch(url);
     
     if (!res.ok) {

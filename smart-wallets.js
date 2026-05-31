@@ -71,21 +71,29 @@ export async function checkSmartWalletsOnPool({ pool_address }) {
 
   const { getWalletPositions } = await import("./tools/dlmm.js");
 
-  const results = await Promise.all(
-    wallets.map(async (wallet) => {
-      try {
-        const cached = _cache.get(wallet.address);
-        if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
-          return { wallet, positions: cached.positions };
-        }
-        const { positions } = await getWalletPositions({ wallet_address: wallet.address });
-        _cache.set(wallet.address, { positions: positions || [], fetchedAt: Date.now() });
-        return { wallet, positions: positions || [] };
-      } catch {
-        return { wallet, positions: [] };
+  // Sequential + throttled to avoid a 429 storm on the RPC (issue #70).
+  // Parallel Promise.all over 100+ wallets would fire all requests within
+  // milliseconds and trip Helius free-tier rate limits, returning incomplete
+  // data to the screener. Cache hits skip the network and the delay.
+  const results = [];
+  let madeNetworkCall = false;
+  for (const wallet of wallets) {
+    try {
+      const cached = _cache.get(wallet.address);
+      if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
+        results.push({ wallet, positions: cached.positions });
+        continue;
       }
-    })
-  );
+      // Space out only real network calls (~6.6 req/s).
+      if (madeNetworkCall) await new Promise((r) => setTimeout(r, 150));
+      madeNetworkCall = true;
+      const { positions } = await getWalletPositions({ wallet_address: wallet.address });
+      _cache.set(wallet.address, { positions: positions || [], fetchedAt: Date.now() });
+      results.push({ wallet, positions: positions || [] });
+    } catch {
+      results.push({ wallet, positions: [] });
+    }
+  }
 
   const inPool = results
     .filter((r) => r.positions.some((p) => p.pool === pool_address))

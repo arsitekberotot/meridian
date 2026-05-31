@@ -1033,7 +1033,14 @@ function parseConfigValue(raw) {
   if (/^null$/i.test(value)) return null;
   if (/^-?\d+(\.\d+)?$/.test(value)) return Number(value);
   if ((value.startsWith("[") && value.endsWith("]")) || (value.startsWith("{") && value.endsWith("}"))) {
-    return JSON.parse(value);
+    try {
+      return JSON.parse(value);
+    } catch {
+      // Malformed JSON from /setcfg or the settings menu — treat as a plain
+      // string instead of throwing and crashing the Telegram handler.
+      log("config_warn", `parseConfigValue: malformed JSON, keeping as string: ${value.slice(0, 80)}`);
+      return value;
+    }
   }
   return value;
 }

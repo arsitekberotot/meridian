@@ -147,6 +147,19 @@ function isThinkingModeToolChoiceError(error) {
   return /thinking mode does not support/i.test(message) && /tool_choice/i.test(message);
 }
 
+// A removed/renamed/unsupported model — recover by switching to the backup model
+// instead of crashing the whole agent cycle (issue #81).
+function isModelUnavailableError(error) {
+  const message = String(error?.message || error?.error?.message || error || "");
+  return (
+    (/\bmodel\b/i.test(message) &&
+      /(not found|does not exist|no longer|decommissioned|deprecated|not a valid model|unavailable|invalid model|unknown model)/i.test(message)) ||
+    /does not support tools/i.test(message) ||
+    /tool use.*not supported/i.test(message) ||
+    /no endpoints found/i.test(message)
+  );
+}
+
 /**
  * Core ReAct agent loop.
  *
@@ -230,6 +243,12 @@ export async function agentLoop(goal, maxSteps = config.llm.maxSteps, sessionHis
           if (!omitToolChoice && isThinkingModeToolChoiceError(error)) {
             omitToolChoice = true;
             log("agent", "Provider thinking mode does not support tool_choice — retrying without it");
+            attempt -= 1;
+            continue;
+          }
+          if (usedModel !== FALLBACK_MODEL && isModelUnavailableError(error)) {
+            log("agent", `Model ${usedModel} unavailable/removed (${error?.message || error}) — switching to fallback ${FALLBACK_MODEL}`);
+            usedModel = FALLBACK_MODEL;
             attempt -= 1;
             continue;
           }

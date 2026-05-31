@@ -234,7 +234,7 @@ const actualBaseFee = baseFactor > 0
 - `getLessonsForPrompt({ agentType })` — injects relevant lessons into system prompt
 - `evolveThresholds()` — adjusts screening thresholds based on winners vs losers
 - Performance recorded via `recordPerformance()` called from executor.js after `close_position`
-- **Known issue**: `evolveThresholds()` references `maxVolatility` and `minFeeTvlRatio` but config.js uses `minFeeActiveTvlRatio` and has no `maxVolatility` key — the evolution of these keys is a no-op
+- `evolveThresholds()` evolves `minFeeActiveTvlRatio` and `minOrganic` (the dead `maxVolatility` branch was removed — there is no max-volatility screen to tune)
 
 ---
 
@@ -260,9 +260,25 @@ Agent Meridian HiveMind sync is handled by `hivemind.js`. It uses built-in Agent
 | `HIVE_MIND_API_KEY` | No | Hive mind auth token |
 | `HELIUS_API_KEY` | No | Enhanced wallet balance data |
 
+### API endpoint overrides (all optional)
+
+Every external host has a default in `config.endpoints` (config.js) and is overridable via env or
+`user-config.json` (precedence: user-config → env → default). Use these when an upstream host
+changes/404s (issue #69) without editing source:
+
+| Var | Default host |
+|-----|--------------|
+| `DLMM_DATAPI_URL` | `dlmm.datapi.meteora.ag` (OHLCV, positions, PnL, portfolio) |
+| `POOL_DISCOVERY_URL` | `pool-discovery-api.datapi.meteora.ag` |
+| `JUPITER_DATAPI_URL` | `datapi.jup.ag/v1` (narrative, asset search) |
+| `JUPITER_PRICE_URL` / `JUPITER_SWAP_URL` | `api.jup.ag/price/v3`, `api.jup.ag/swap/v2` |
+| `HELIUS_API_URL` | `api.helius.xyz/v1` |
+| `OKX_API_URL` | `web3.okx.com` |
+| `LPAGENT_API_URL` | `api.lpagent.io/open-api/v1` |
+| `DEXSCREENER_URL` / `RUGCHECK_URL` | `api.dexscreener.com`, `api.rugcheck.xyz/v1` (discord pre-checks) |
+
 ---
 
 ## Known Issues / Tech Debt
 
-- `lessons.js evolveThresholds()` evolves `maxVolatility` + `minFeeTvlRatio` (wrong key names — should be `minFeeActiveTvlRatio`; `maxVolatility` doesn't exist in config at all). The evolution is a no-op for those keys.
 - `get_wallet_positions` tool (dlmm.js) is in definitions.js but not in MANAGER_TOOLS or SCREENER_TOOLS — only available in GENERAL role.
