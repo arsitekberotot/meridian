@@ -10,6 +10,7 @@
 
 import fs from "fs";
 import { log } from "./logger.js";
+import { config } from "./config.js";
 
 const STATE_FILE = "./state.json";
 
@@ -68,6 +69,7 @@ export function trackPosition({
   organic_score,
   initial_value_usd,
   signal_snapshot = null,
+  zone = null,
 }) {
   const state = load();
   state.positions[position] = {
@@ -86,6 +88,7 @@ export function trackPosition({
     organic_score,
     initial_value_usd,
     signal_snapshot: signal_snapshot || null,
+    zone: zone || null,
     deployed_at: new Date().toISOString(),
     out_of_range_since: null,
     last_claim_at: null,
@@ -430,6 +433,23 @@ export function updatePnlAndCheckExits(position_address, positionData, mgmtConfi
         drop_from_peak_pct: dropFromPeak,
       };
     }
+  }
+
+  // ── SPR/RPS zone break (down) ──────────────────────────────────
+  // Mirror of getDeterministicCloseRule rule 6 so the 30s poller catches a fast
+  // break below the zone floor (S1) between management crons.
+  if (
+    config.zones?.enabled &&
+    config.zones.exitOnZoneBreak &&
+    pos.zone &&
+    pos.zone.lower_bin != null &&
+    positionData.active_bin != null &&
+    positionData.active_bin < pos.zone.lower_bin
+  ) {
+    return {
+      action: "ZONE_EXIT",
+      reason: `Zone break: price below S1 (active bin ${positionData.active_bin} < zone floor ${pos.zone.lower_bin})`,
+    };
   }
 
   // ── Out of range too long ──────────────────────────────────────

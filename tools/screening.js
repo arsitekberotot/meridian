@@ -4,6 +4,7 @@ import { isDevBlocked, getBlockedDevs } from "../dev-blocklist.js";
 import { log } from "../logger.js";
 import { isBaseMintOnCooldown, isPoolOnCooldown } from "../pool-memory.js";
 import { confirmIndicatorPreset } from "./chart-indicators.js";
+import { analyzeZone, clearZoneCache } from "./zones.js";
 import { getAgentMeridianBase, getAgentMeridianHeaders } from "./agent-meridian.js";
 
 const DATAPI_JUP = "https://datapi.jup.ag/v1";
@@ -746,6 +747,33 @@ export async function getTopCandidates({ limit = 10 } = {}) {
     eligible.splice(0, eligible.length, ...confirmedEligible);
     if (eligible.length < before) {
       log("screening", `Indicator confirmation removed ${before - eligible.length} candidate(s)`);
+    }
+  }
+
+  // SPR/RPS pivot-zone enrichment — attach pivot levels + breaksolid signal per
+  // candidate so the LLM can prefer coins sitting in a clean S1–R1 band. Never
+  // hard-blocks on a fetch miss (quality "no_data") unless requireBreaksolid is on.
+  if (config.zones.enabled && eligible.length > 0) {
+    clearZoneCache();
+    const zoneResults = await Promise.allSettled(
+      eligible.map((p) => analyzeZone({ pool_address: p.pool, currentPrice: p.price })),
+    );
+    for (let i = 0; i < eligible.length; i++) {
+      eligible[i].zone = zoneResults[i].status === "fulfilled" ? zoneResults[i].value : null;
+    }
+    if (config.zones.requireBreaksolid) {
+      const before = eligible.length;
+      const kept = eligible.filter((p) => {
+        if (p.zone?.breaksolid) return true;
+        // Don't punish missing data — only drop coins we *can* read that lack a breaksolid.
+        if (!p.zone || p.zone.quality === "no_data") return true;
+        pushFilteredReason(filteredOut, p, "no breaksolid on pivot zone");
+        return false;
+      });
+      eligible.splice(0, eligible.length, ...kept);
+      if (eligible.length < before) {
+        log("screening", `Zone requireBreaksolid removed ${before - eligible.length} candidate(s)`);
+      }
     }
   }
 

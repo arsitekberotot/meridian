@@ -30,6 +30,7 @@ tools/
   wallet.js         SOL/token balances (Helius) + Jupiter swap
   token.js          Token info/holders/narrative (Jupiter API)
   study.js          Top LPer study via LPAgent API
+  zones.js          SPR/RPS pivot zones: OHLCV fetch + pivot math + breaksolid detection
 ```
 
 ---
@@ -94,6 +95,13 @@ Sets defined in `agent.js:6-7`. If you add a tool, also add it to the relevant s
 
 **`computeDeployAmount(walletSol)`** — scales position size with wallet balance (compounding). Formula: `clamp(deployable × positionSizePct, floor=deployAmountSol, ceil=maxDeployAmount)`.
 
+**Pivot zones** live under a *nested* `zones` object in `user-config.json` (not flat keys):
+`enabled` (false), `pivotTimeframe` ("1h"), `pivotLookback` (1), `entryTimeframe` ("5m"),
+`confirmTimeframe` ("15m"), `breaksolidCandles` (2), `wickTolerancePct` (0.1),
+`exitConfirmCandles` (1), `zoneFloorLevel`/`zoneCeilLevel` ("S1"/"R1"), `requireBreaksolid`
+(false), `exitOnZoneBreak` (true). `reloadScreeningThresholds()` re-reads the nested `zones`
+object. See "SPR/RPS Pivot Zones" below.
+
 ---
 
 ## Position Lifecycle
@@ -132,6 +140,38 @@ bins_below = round(minBinsBelow + (volatility / 5) * (maxBinsBelow - minBinsBelo
 - `volatility <= 0`, null, or non-finite → skip/refuse deploy
 - High volatility (5+) → maxBinsBelow
 - Any value in between is valid (continuous, not tiered)
+
+---
+
+## SPR/RPS Pivot Zones (`tools/zones.js`)
+
+Structure-based entry/exit using classic floor-trader **Pivot Points** (PP, S1, R1). Off by
+default (`config.zones.enabled = false`); when on it augments — does not replace — the metric
+screen and existing close rules. No technical indicators (RSI/Bollinger/Supertrend) involved.
+
+- **Data source**: `https://dlmm.datapi.meteora.ag/pools/{pool}/ohlcv?timeframe={5m|15m|1h}`
+  (`getPoolOhlcv`, per-cycle cached, never throws). Same host already used by `findRivalPool`.
+- **Pivots**: `computePivots({H,L,C})` → `PP=(H+L+C)/3`, `R1=2PP−L`, `S1=2PP−H`. Reference
+  candle = last *completed* candle(s) of `pivotTimeframe` (aggregated over `pivotLookback`).
+- **Breaksolid (entry signal)**: `detectBreaksolid()` — the last `breaksolidCandles` (2) closed
+  `entryTimeframe` (M5) candles each close beyond PP, body-dominant (`wickTolerancePct`), AND the
+  last `confirmTimeframe` (M15) candle confirms the same direction.
+- **Screening (Phase 1)**: `getTopCandidates()` attaches `candidate.zone` (via `analyzeZone`);
+  `index.js` injects a `zone:` line into the candidate block; the screener prompt prefers
+  `breaksolid=up` inside the S1–R1 band. `requireBreaksolid` (default off) hard-filters, but
+  never on `quality:"no_data"` (missing data ≠ rejection).
+- **Deploy (Phase 2a)**: when a candidate has a usable zone, the LLM passes
+  `deploy_position.downside_pct = zone.suggested_downside_pct` to anchor the lower liquidity edge
+  at **S1** (reuses the existing `downside_pct` → `getBinIdFromPrice` path; `MIN_SAFE_BINS_BELOW`
+  still applies). `deployPosition` recomputes the zone at deploy and stores it on the position.
+- **Exit (Phase 2c)**: zone-break-down is **Rule 6** in `getDeterministicCloseRule` + a
+  `ZONE_EXIT` action in `updatePnlAndCheckExits` (30s poller). Fires when
+  `active_bin < zone.lower_bin` (price below S1 → "keluar zona itu out"), cutting a forming bag
+  immediately instead of waiting for the −50% stop loss. Upside OOR keeps existing rules 3/4;
+  stop-loss/take-profit remain hard safety nets and take precedence.
+
+State: each position gains a `zone` field
+(`{ pivot, s1, r1, lower_bin, upper_bin, breaksolid, direction, source:"pivot" }`).
 
 ---
 

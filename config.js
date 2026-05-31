@@ -42,6 +42,7 @@ if (u.publicApiKey) process.env.PUBLIC_API_KEY ||= u.publicApiKey;
 if (u.agentMeridianApiUrl) process.env.AGENT_MERIDIAN_API_URL ||= u.agentMeridianApiUrl;
 
 const indicatorUserConfig = u.chartIndicators ?? {};
+const zonesUserConfig = u.zones ?? {};
 
 function nonEmptyString(...values) {
   for (const value of values) {
@@ -203,6 +204,22 @@ export const config = {
     rsiOverbought: indicatorUserConfig.rsiOverbought ?? 80,
     requireAllIntervals: indicatorUserConfig.requireAllIntervals ?? false,
   },
+
+  // ─── SPR/RPS Pivot Zones ───────────────
+  zones: {
+    enabled:           zonesUserConfig.enabled           ?? false,   // master switch (observe-first)
+    pivotTimeframe:    zonesUserConfig.pivotTimeframe     ?? "1h",    // candle set for PP/S1/R1
+    pivotLookback:     zonesUserConfig.pivotLookback      ?? 1,       // # completed candles aggregated for H/L/C
+    entryTimeframe:    zonesUserConfig.entryTimeframe     ?? "5m",    // breaksolid primary TF
+    confirmTimeframe:  zonesUserConfig.confirmTimeframe   ?? "15m",   // breaksolid confirm TF
+    breaksolidCandles: zonesUserConfig.breaksolidCandles  ?? 2,       // consecutive entry-TF closes to confirm
+    wickTolerancePct:  zonesUserConfig.wickTolerancePct   ?? 0.1,     // body-vs-wick filter for "solid" breaks/exits
+    exitConfirmCandles: zonesUserConfig.exitConfirmCandles ?? 1,      // closed candles beyond S1 to trigger exit
+    zoneFloorLevel:    zonesUserConfig.zoneFloorLevel     ?? "S1",    // zone lower bound
+    zoneCeilLevel:     zonesUserConfig.zoneCeilLevel      ?? "R1",    // zone upper bound
+    requireBreaksolid: zonesUserConfig.requireBreaksolid  ?? false,   // Phase-1 hard filter toggle
+    exitOnZoneBreak:   zonesUserConfig.exitOnZoneBreak    ?? true,    // enable zone-break close rule
+  },
 };
 
 /**
@@ -274,5 +291,10 @@ export function reloadScreeningThresholds() {
       config.strategy.minBinsBelow,
       Math.min(config.strategy.maxBinsBelow, Math.round(defaultBinsBelow)),
     );
+    if (fresh.zones && typeof fresh.zones === "object") {
+      for (const [key, value] of Object.entries(fresh.zones)) {
+        if (key in config.zones && value !== undefined) config.zones[key] = value;
+      }
+    }
   } catch { /* ignore */ }
 }

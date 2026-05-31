@@ -582,6 +582,7 @@ export async function runScreeningCycle({ silent = false } = {}) {
         pool.price_vs_ath_pct != null ? `  ath: price_vs_ath=${pool.price_vs_ath_pct}%${pool.top_cluster_trend ? `, top_cluster=${pool.top_cluster_trend}` : ""}` : null,
         `  smart_wallets: ${sw?.in_pool?.length ?? 0} present${sw?.in_pool?.length ? ` → CONFIDENCE BOOST (${sw.in_pool.map(w => w.name).join(", ")})` : ""}`,
         activeBin != null ? `  active_bin: ${activeBin}` : null,
+        pool.zone && pool.zone.quality !== "no_data" ? `  zone: ${pool.zone.note}${pool.zone.suggested_downside_pct != null ? ` | deploy downside≈${pool.zone.suggested_downside_pct}% (anchor lower edge at S1)` : ""}` : null,
         priceChange != null ? `  1h: price${priceChange >= 0 ? "+" : ""}${priceChange}%, net_buyers=${netBuyers ?? "?"}` : null,
         n?.narrative ? `  narrative_untrusted: ${sanitizeUntrustedPromptText(n.narrative, 500)}` : `  narrative_untrusted: none`,
         mem ? `  memory_untrusted: ${sanitizeUntrustedPromptText(mem, 500)}` : null,
@@ -608,6 +609,13 @@ export async function runScreeningCycle({ silent = false } = {}) {
 
     const weightsSummary = config.darwin?.enabled ? getWeightsSummary() : null;
 
+    const zoneGuidance = config.zones.enabled
+      ? `\nPIVOT ZONES (SPR/RPS) ACTIVE:
+   - Prefer candidates with breaksolid=up and price inside the S1–R1 band (zone line above). A confirmed M5+M15 breaksolid above the pivot is the strongest entry signal.
+   - Treat zone quality "no_data"/"stale" as neutral — do NOT hard-reject a candidate just because pivot data is missing.
+   - When a chosen candidate shows a "deploy downside≈X%" hint, pass deploy_position.downside_pct = X instead of computing bins_below from volatility (this anchors the lower liquidity edge at S1). Omit bins_below when you pass downside_pct.`
+      : "";
+
     let deployAttempted = false;
     let deploySucceeded = false;
     const { content } = await agentLoop(`
@@ -625,7 +633,7 @@ STEPS:
    bins_below = round(${config.strategy.minBinsBelow} + (candidate volatility/5)*(${config.strategy.maxBinsBelow - config.strategy.minBinsBelow})) clamped to [${config.strategy.minBinsBelow},${config.strategy.maxBinsBelow}].
    pass deploy_position.volatility = the candidate volatility value.
    For single-side SOL deploys, do not invent upside:
-   set amount_y only, keep amount_x = 0, keep bins_above = 0, and let the upper bin stay at the active bin.
+   set amount_y only, keep amount_x = 0, keep bins_above = 0, and let the upper bin stay at the active bin.${zoneGuidance}
 4. Report in this exact format (no tables, no extra sections):
    🚀 DEPLOYED
 
@@ -924,6 +932,20 @@ function getDeterministicCloseRule(position, managementConfig) {
     (position.minutes_out_of_range ?? 0) >= managementConfig.outOfRangeWaitMinutes
   ) {
     return { action: "CLOSE", rule: 4, reason: "OOR" };
+  }
+  // Rule 6: SPR/RPS zone break (down). For a single-sided SOL support deploy,
+  // price falling below the zone floor (S1 ≈ deployed lower bin) invalidates the
+  // thesis — "keluar zona itu out". Cut immediately rather than waiting for the
+  // -50% stop loss to fill the bag. Up-side OOR is still handled by rules 3/4.
+  if (
+    config.zones.enabled &&
+    config.zones.exitOnZoneBreak &&
+    tracked?.zone &&
+    position.active_bin != null &&
+    tracked.zone.lower_bin != null &&
+    position.active_bin < tracked.zone.lower_bin
+  ) {
+    return { action: "CLOSE", rule: 6, reason: "zone break (below S1)" };
   }
   if (
     position.fee_per_tvl_24h != null &&

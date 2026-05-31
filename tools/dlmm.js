@@ -605,6 +605,31 @@ export async function deployPosition({
 
   const minPrice = Number(getPriceOfBinByBinId(minBinId, actualBinStep).toString());
   const maxPrice = Number(getPriceOfBinByBinId(maxBinId, actualBinStep).toString());
+
+  // SPR/RPS pivot-zone snapshot — recomputed at deploy time so the stored zone
+  // (S1/R1/PP) is consistent with the actual entry, and binds the zone floor to
+  // the deployed lower bin for the zone-break exit rule.
+  let zoneSnapshot = null;
+  if (config.zones?.enabled) {
+    try {
+      const { analyzeZone } = await import("./zones.js");
+      const z = await analyzeZone({ pool_address, currentPrice: activePrice });
+      if (z && z.quality !== "no_data") {
+        zoneSnapshot = {
+          pivot: z.pivot, s1: z.s1, r1: z.r1, s2: z.s2, r2: z.r2,
+          lower_price: minPrice, upper_price: maxPrice,
+          lower_bin: minBinId, upper_bin: maxBinId,
+          breaksolid: z.breaksolid, direction: z.direction,
+          pivot_tf: config.zones.pivotTimeframe,
+          entered_at: new Date().toISOString(),
+          source: "pivot",
+        };
+      }
+    } catch (error) {
+      log("zones", `Zone snapshot failed at deploy for ${pool_address.slice(0, 8)}: ${error.message}`);
+    }
+  }
+
   const downsideCoveragePct = activePrice > 0 ? ((activePrice - minPrice) / activePrice) * 100 : null;
   const upsideCoveragePct = activePrice > 0 ? ((maxPrice - activePrice) / activePrice) * 100 : null;
   const totalWidthPct = minPrice > 0 ? ((maxPrice - minPrice) / minPrice) * 100 : null;
@@ -702,6 +727,7 @@ export async function deployPosition({
           active_bin: activeBin.binId,
           initial_value_usd,
           signal_snapshot: signalSnapshot,
+          zone: zoneSnapshot,
         });
       }
 
@@ -840,6 +866,7 @@ export async function deployPosition({
       active_bin: activeBin.binId,
       initial_value_usd,
       signal_snapshot: signalSnapshot,
+      zone: zoneSnapshot,
     });
 
     appendDecision({
