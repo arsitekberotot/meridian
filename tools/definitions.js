@@ -768,6 +768,34 @@ Examples:
     }
   },
 
+  // ─── Zone Analysis ─────────────────────────────────────────────
+
+  {
+    type: "function",
+    function: {
+      name: "analyze_zone",
+      description: `Compute SPR/RPS pivot zones for a pool using OHLCV candles.
+Returns pivot point (PP), support (S1), resistance (R1), price position relative to pivots,
+breaksolid entry signal, and suggested downside% for anchoring the lower bin edge at S1.
+Use this to manually check a pool's zone quality before deploying, or to audit an existing position's zone.
+Degrades to quality="no_data" if OHLCV data is unavailable — never throws.`,
+      parameters: {
+        type: "object",
+        properties: {
+          pool_address: {
+            type: "string",
+            description: "Pool address to analyze"
+          },
+          current_price: {
+            type: "number",
+            description: "Current token price in quote units. If omitted, uses the last candle close."
+          }
+        },
+        required: ["pool_address"]
+      }
+    }
+  },
+
   // ─── Strategy Library ──────────────────────────────────────────
 
   {
