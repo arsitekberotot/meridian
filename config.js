@@ -194,6 +194,7 @@ export const config = {
     lpAgent:        nonEmptyString(u.lpAgentApiUrl,     process.env.LPAGENT_API_URL,    "https://api.lpagent.io/open-api/v1"),
     dexScreener:    nonEmptyString(u.dexScreenerUrl,    process.env.DEXSCREENER_URL,    "https://api.dexscreener.com"),
     rugcheck:       nonEmptyString(u.rugcheckUrl,       process.env.RUGCHECK_URL,       "https://api.rugcheck.xyz/v1"),
+    gmgn:           nonEmptyString(u.gmgnApiUrl,        process.env.GMGN_API_URL,       "https://gmgn.ai"),
   },
 
   jupiter: {

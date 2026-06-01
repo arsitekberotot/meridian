@@ -613,10 +613,10 @@ export async function getTopCandidates({ limit = 10 } = {}) {
     }
   }
 
-  // Enrich with OKX data — advanced info (risk/bundle/sniper) + ATH price (no API key required)
+  // Enrich with GMGN data — advanced info (risk/bundle/smart-money) + ATH price (public, no key required)
   if (eligible.length > 0) {
-    const { getAdvancedInfo, getPriceInfo, getClusterList, getRiskFlags } = await import("./okx.js");
-    const okxResults = await Promise.allSettled(
+    const { getAdvancedInfo, getPriceInfo, getClusterList, getRiskFlags } = await import("./gmgn.js");
+    const gmgnResults = await Promise.allSettled(
       eligible.map(async (p) => {
         if (!p.base?.mint) return { adv: null, price: null, clusters: [], risk: null };
         const [adv, price, clusters, risk] = await Promise.allSettled([
@@ -627,10 +627,10 @@ export async function getTopCandidates({ limit = 10 } = {}) {
         ]);
 
         const mintShort = p.base.mint.slice(0, 8);
-        if (adv.status !== "fulfilled")      log("okx", `advanced-info unavailable for ${p.name} (${mintShort})`);
-        if (price.status !== "fulfilled")    log("okx", `price-info unavailable for ${p.name} (${mintShort})`);
-        if (clusters.status !== "fulfilled") log("okx", `cluster-list unavailable for ${p.name} (${mintShort})`);
-        if (risk.status !== "fulfilled")     log("okx", `risk-check unavailable for ${p.name} (${mintShort})`);
+        if (adv.status !== "fulfilled")      log("gmgn", `advanced-info unavailable for ${p.name} (${mintShort})`);
+        if (price.status !== "fulfilled")    log("gmgn", `price-info unavailable for ${p.name} (${mintShort})`);
+        if (clusters.status !== "fulfilled") log("gmgn", `cluster-list unavailable for ${p.name} (${mintShort})`);
+        if (risk.status !== "fulfilled")     log("gmgn", `risk-check unavailable for ${p.name} (${mintShort})`);
 
         return {
           adv: adv.status === "fulfilled" ? adv.value : null,
@@ -641,7 +641,7 @@ export async function getTopCandidates({ limit = 10 } = {}) {
       })
     );
     for (let i = 0; i < eligible.length; i++) {
-      const r = okxResults[i];
+      const r = gmgnResults[i];
       if (r.status !== "fulfilled") continue;
       const { adv, price, clusters, risk } = r.value;
       if (adv) {
@@ -657,20 +657,19 @@ export async function getTopCandidates({ limit = 10 } = {}) {
       }
       if (risk) {
         eligible[i].is_rugpull = risk.is_rugpull;
-        eligible[i].is_wash    = risk.is_wash;
+        eligible[i].is_wash    = risk.is_wash; // always null from GMGN; filter degrades gracefully
       }
       if (price) {
         eligible[i].price_vs_ath_pct = price.price_vs_ath_pct;
         eligible[i].ath              = price.ath;
       }
       if (clusters?.length) {
-        // Surface KOL presence and top cluster trend for LLM
         eligible[i].kol_in_clusters      = clusters.some((c) => c.has_kol);
-        eligible[i].top_cluster_trend    = clusters[0]?.trend ?? null;      // buy|sell|neutral
+        eligible[i].top_cluster_trend    = clusters[0]?.trend ?? null;
         eligible[i].top_cluster_hold_pct = clusters[0]?.holding_pct ?? null;
       }
     }
-    // Wash trading hard filter — fake volume = misleading fee yield
+    // Wash trading hard filter (is_wash is null from GMGN — passes through; OKX-populated data still filtered)
     eligible.splice(0, eligible.length, ...eligible.filter((p) => {
       if (p.is_wash) {
         log("screening", `Risk filter: dropped ${p.name} — wash trading flagged`);
@@ -701,14 +700,14 @@ export async function getTopCandidates({ limit = 10 } = {}) {
     const before = eligible.length;
     const filtered = eligible.filter((p) => {
       if (p.dev && isDevBlocked(p.dev)) {
-        log("dev_blocklist", `Filtered blocked deployer (okx) ${p.dev.slice(0, 8)} token ${p.base?.symbol}`);
+        log("dev_blocklist", `Filtered blocked deployer (gmgn) ${p.dev.slice(0, 8)} token ${p.base?.symbol}`);
         pushFilteredReason(filteredOut, p, "blocked deployer");
         return false;
       }
       return true;
     });
     eligible.splice(0, eligible.length, ...filtered);
-    if (eligible.length < before) log("dev_blocklist", `Filtered ${before - eligible.length} pool(s) via OKX creator check`);
+    if (eligible.length < before) log("dev_blocklist", `Filtered ${before - eligible.length} pool(s) via GMGN creator check`);
   }
 
   if (config.indicators.enabled && eligible.length > 0) {

@@ -29,6 +29,8 @@ tools/
   screening.js      Pool discovery from Meteora API
   wallet.js         SOL/token balances (Helius) + Jupiter swap
   token.js          Token info/holders/narrative (Jupiter API)
+  okx.js            OKX DEX enrichment (token.js holder analysis; NOT used for screening)
+  gmgn.js           GMGN.ai enrichment for screening: bundle%, smart-money, ATH, risk flags
   study.js          Top LPer study via LPAgent API
   zones.js          SPR/RPS pivot zones: OHLCV fetch + pivot math + breaksolid detection
 ```
@@ -273,7 +275,8 @@ changes/404s (issue #69) without editing source:
 | `JUPITER_DATAPI_URL` | `datapi.jup.ag/v1` (narrative, asset search) |
 | `JUPITER_PRICE_URL` / `JUPITER_SWAP_URL` | `api.jup.ag/price/v3`, `api.jup.ag/swap/v2` |
 | `HELIUS_API_URL` | `api.helius.xyz/v1` |
-| `OKX_API_URL` | `web3.okx.com` |
+| `OKX_API_URL` | `web3.okx.com` (token.js holder/cluster enrichment only — not screening) |
+| `GMGN_API_URL` | `gmgn.ai` (screening enrichment: bundle%, smart-money, ATH, risk flags) |
 | `LPAGENT_API_URL` | `api.lpagent.io/open-api/v1` |
 | `DEXSCREENER_URL` / `RUGCHECK_URL` | `api.dexscreener.com`, `api.rugcheck.xyz/v1` (discord pre-checks) |
 
